@@ -1,6 +1,6 @@
 terraform {
   # Pin Terraform and provider versions for repeatable builds.
-  required_version = ">= 1.6.0"
+  required_version = ">= 1.5.7"
 
   backend "gcs" {}
 

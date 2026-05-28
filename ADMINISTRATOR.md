@@ -38,7 +38,7 @@ When the VM is deployed from Terraform in this repo, Cloud Logging is expected t
 Cloud Logging is the preferred operator surface, but these are the underlying local paths and sources:
 
 1. Vaultwarden application log:
-   - `/opt/vaultwarden-gcp-deploy/vaultwarden/vaultwarden.log`
+   - `/mnt/stateful_partition/vaultwarden-gcp-deploy/vaultwarden/vaultwarden.log`
    - Used by fail2ban for login and admin-path detection
 2. Docker container json logs for each container:
    - `/var/lib/docker/containers/<container-id>/<container-id>-json.log`
@@ -87,7 +87,7 @@ For this repo specifically:
 1. Caddy logs to stderr, so its runtime logs should appear in both Docker logs and Cloud Logging
 2. The backup container writes to `/var/log/backup.log`, but that path is symlinked to container stdout, so those entries should also appear in Docker logs and Cloud Logging
 3. The countryblock container writes to `/var/log/block.log`, but that path is symlinked to container stdout, so those entries should also appear in Docker logs and Cloud Logging
-4. Vaultwarden also writes a persistent file log at `/opt/vaultwarden-gcp-deploy/vaultwarden/vaultwarden.log`; that file exists for local persistence and fail2ban input, and should not be assumed to be the same thing as the container stdout stream
+4. Vaultwarden also writes a persistent file log at `/mnt/stateful_partition/vaultwarden-gcp-deploy/vaultwarden/vaultwarden.log`; that file exists for local persistence and fail2ban input, and should not be assumed to be the same thing as the container stdout stream
 
 Operationally, treat Cloud Logging as the primary view for container output, but do not assume it is a perfect mirror of every local file-based log on the VM.
 

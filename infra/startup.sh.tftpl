@@ -3,6 +3,8 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
+WORKDIR="/mnt/stateful_partition/vaultwarden-gcp-deploy"
+
 configure_docker_daemon() {
   local desired_config
   desired_config="$(mktemp)"
@@ -37,39 +39,38 @@ EOF
 
 configure_docker_daemon
 
-mkdir -p /opt
+mkdir -p /mnt/stateful_partition
 
-if [ ! -d /opt/vaultwarden-gcp-deploy ]; then
+if [ ! -d "$WORKDIR/.git" ]; then
   docker run --rm \
-    -v /opt:/work \
+    -v /mnt/stateful_partition:/work \
     -w /work \
     alpine/git \
     clone "${repo_url}" vaultwarden-gcp-deploy
 fi
 
 docker run --rm \
-  -v /opt/vaultwarden-gcp-deploy:/repo \
+  -v "$WORKDIR:/repo" \
   -w /repo \
   alpine/git \
   fetch --all --tags
 
 if [ -n "${repo_ref}" ]; then
   docker run --rm \
-    -v /opt/vaultwarden-gcp-deploy:/repo \
+    -v "$WORKDIR:/repo" \
     -w /repo \
     alpine/git \
     checkout "${repo_ref}"
 fi
 
-chmod +x /opt/vaultwarden-gcp-deploy/utilities/*.sh
+chmod +x "$WORKDIR"/utilities/*.sh
 
 export PROJECT_ID="${project_id}"
 export ENV_SECRET="${env_secret_name}"
 export DDCLIENT_SECRET="${ddclient_secret_name}"
-export WORKDIR="/opt/vaultwarden-gcp-deploy"
 
-bash /opt/vaultwarden-gcp-deploy/utilities/fetch-secrets.sh
-bash /opt/vaultwarden-gcp-deploy/utilities/bootstrap.sh
+bash "$WORKDIR"/utilities/fetch-secrets.sh
+bash "$WORKDIR"/utilities/bootstrap.sh
 
 # Schedule reboot when COS updates require it (runs in background).
-TZ="${reboot_timezone}" TIME="${reboot_time}" /opt/vaultwarden-gcp-deploy/utilities/reboot-on-update.sh &
+TZ="${reboot_timezone}" TIME="${reboot_time}" "$WORKDIR"/utilities/reboot-on-update.sh &

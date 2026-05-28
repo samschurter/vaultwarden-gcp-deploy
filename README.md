@@ -52,6 +52,8 @@ Run the interactive helper from Cloud Shell:
 bash utilities/create-gcp-secrets.sh
 ```
 
+Before prompting for secrets, the helper also enables the Google Cloud APIs this deployment needs in a new project: Cloud Resource Manager, IAM, Compute Engine, Secret Manager, and Cloud Storage.
+
 You must already be logged in to the `gcloud` CLI and have permission to create or update Secret Manager secrets in the target project.
 
 The script uses the active Cloud Shell project automatically. It does not ask for a project ID.
@@ -125,6 +127,8 @@ From the repo root in Cloud Shell, run these commands in order:
 2. `terraform init -backend-config=backend.hcl`
 3. `terraform apply`
 
+Terraform also declares those required project APIs, so a direct `apply` in an already-authorized project can reconcile them if they were not enabled yet. The helper script is still the smoother first-run path because API enablement can take a short time to propagate.
+
 After apply completes, the output includes the VM’s external IP address.
 
 If you are re-running this from a different machine or a fresh Cloud Shell home directory, use `terraform init -reconfigure -backend-config=backend.hcl`.
@@ -147,7 +151,7 @@ The `--prepare-terraform` mode recreates `infra/backend.hcl` locally if needed, 
 The VM automatically runs a startup script that:
 
 1. Uses Docker that ships with COS.
-2. Clones this repo into `/opt/vaultwarden-gcp-deploy`.
+2. Clones this repo into `/mnt/stateful_partition/vaultwarden-gcp-deploy`.
 3. Pulls secrets from Secret Manager into runtime files and starts the stack from them.
 4. Builds the local images and starts the stack.
 5. Schedules a reboot when COS updates require it.

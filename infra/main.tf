@@ -1,37 +1,67 @@
 locals {
   backup_bucket_name = var.backup_bucket_name != "" ? var.backup_bucket_name : "${var.project_id}-${var.instance_name}-backups"
+  required_services = toset([
+    "cloudresourcemanager.googleapis.com",
+    "compute.googleapis.com",
+    "iam.googleapis.com",
+    "secretmanager.googleapis.com",
+    "storage.googleapis.com",
+  ])
+}
+
+resource "google_project_service" "required" {
+  for_each = local.required_services
+
+  project = var.project_id
+  service = each.value
+
+  disable_dependent_services = false
+  disable_on_destroy         = false
 }
 
 resource "google_service_account" "vaultwarden" {
   # Instance identity for Secret Manager and GCS backup access.
   account_id   = "${var.instance_name}-sa"
   display_name = "${var.instance_name} service account"
+  depends_on   = [google_project_service.required]
 }
 
 resource "google_project_iam_member" "secret_accessor" {
   # Allow the VM to read secrets at boot.
-  project = var.project_id
-  role   = "roles/secretmanager.secretAccessor"
-  member = "serviceAccount:${google_service_account.vaultwarden.email}"
+  project    = var.project_id
+  role       = "roles/secretmanager.secretAccessor"
+  member     = "serviceAccount:${google_service_account.vaultwarden.email}"
+  depends_on = [google_project_service.required]
+}
+
+resource "google_project_iam_member" "log_writer" {
+  # Allow the COS guest agents and startup flow to write to Cloud Logging.
+  project    = var.project_id
+  role       = "roles/logging.logWriter"
+  member     = "serviceAccount:${google_service_account.vaultwarden.email}"
+  depends_on = [google_project_service.required]
 }
 
 resource "google_storage_bucket_iam_member" "backup_object_admin" {
   # Limit backup access to the managed GCS bucket instead of the whole project.
-  bucket = google_storage_bucket.backup.name
-  role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${google_service_account.vaultwarden.email}"
+  bucket     = google_storage_bucket.backup.name
+  role       = "roles/storage.objectAdmin"
+  member     = "serviceAccount:${google_service_account.vaultwarden.email}"
+  depends_on = [google_project_service.required]
 }
 
 resource "google_compute_firewall" "allow_http_https" {
   # Public HTTP/HTTPS for Caddy + Vaultwarden.
-  name    = "${var.instance_name}-allow-http-https"
-  network = "default"
+  name       = "${var.instance_name}-allow-http-https"
+  network    = "default"
+  depends_on = [google_project_service.required]
 
   allow {
     protocol = "tcp"
     ports    = ["80", "443"]
   }
 
+  source_ranges = ["0.0.0.0/0"]
   target_tags = ["http-server", "https-server", var.instance_name]
 }
 
@@ -41,6 +71,7 @@ resource "google_compute_firewall" "deny_ssh" {
   network   = "default"
   priority  = 900
   direction = "INGRESS"
+  depends_on = [google_project_service.required]
 
   deny {
     protocol = "tcp"
@@ -53,9 +84,10 @@ resource "google_compute_firewall" "deny_ssh" {
 
 resource "google_compute_address" "vaultwarden" {
   # Optional static IP (paid) — default is ephemeral.
-  count  = var.use_static_ip ? 1 : 0
-  name   = "${var.instance_name}-ip"
-  region = var.region
+  count      = var.use_static_ip ? 1 : 0
+  name       = "${var.instance_name}-ip"
+  region     = var.region
+  depends_on = [google_project_service.required]
 }
 
 resource "google_storage_bucket" "backup" {
@@ -63,6 +95,7 @@ resource "google_storage_bucket" "backup" {
   name          = local.backup_bucket_name
   location      = var.region
   force_destroy = false
+  depends_on    = [google_project_service.required]
 
   uniform_bucket_level_access = true
   versioning {
@@ -75,6 +108,7 @@ resource "google_compute_instance" "vaultwarden" {
   name         = var.instance_name
   machine_type = var.machine_type
   zone         = var.zone
+  depends_on   = [google_project_service.required]
 
   tags = ["http-server", "https-server", var.instance_name]
 

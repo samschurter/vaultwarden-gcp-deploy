@@ -79,6 +79,21 @@ generate_admin_token() {
   openssl rand -hex 32
 }
 
+print_admin_token_notice() {
+  local admin_token="$1"
+
+  printf '\n'
+  printf '============================================================\n'
+  printf 'BOOTSTRAP ADMIN TOKEN - COPY THIS NOW\n'
+  printf '============================================================\n'
+  printf '%s\n' "$admin_token"
+  printf '\n'
+  printf 'Save this token somewhere safe before you continue.\n'
+  printf 'You can recover it later from Secret Manager by reading the\n'
+  printf 'latest version of the env secret.\n'
+  printf '============================================================\n'
+}
+
 require_non_empty() {
   local field_name="$1"
   local field_value="$2"
@@ -87,6 +102,20 @@ require_non_empty() {
     printf 'Error: %s is required.\n' "$field_name" >&2
     exit 1
   fi
+}
+
+ensure_project_services_enabled() {
+  printf 'Ensuring required Google Cloud APIs are enabled...\n'
+
+  gcloud services enable \
+    cloudresourcemanager.googleapis.com \
+    iam.googleapis.com \
+    compute.googleapis.com \
+    secretmanager.googleapis.com \
+    storage.googleapis.com \
+    --project="$project_id" >/dev/null
+
+  printf 'Required Google Cloud APIs are enabled for project %s\n' "$project_id"
 }
 
 validate_hostname() {
@@ -365,6 +394,7 @@ if [ "$SCRIPT_MODE" = '--clear-admin-token' ]; then
 fi
 
 if [ "$SCRIPT_MODE" = '--prepare-terraform' ]; then
+  ensure_project_services_enabled
   prepare_terraform_mode
 fi
 
@@ -373,6 +403,8 @@ printf 'Templates: %s and %s\n\n' "$ROOT_DIR/.env.template" "$ROOT_DIR/ddns/ddcl
 
 printf 'Using active gcloud project: %s\n\n' "$project_id"
 printf 'Terraform variables file: %s\n\n' "$TFVARS_FILE"
+
+ensure_project_services_enabled
 
 env_secret_name="$(prompt_value 'Env secret name' "$ENV_SECRET_NAME")"
 ddclient_secret_name="$(prompt_value 'ddclient secret name' "$DDCLIENT_SECRET_NAME")"
@@ -389,7 +421,7 @@ ensure_hostname_matches_zone "$hostname" "$zone"
 acme_email="$(prompt_value "Let's Encrypt email address")"
 require_non_empty "Let's Encrypt email address" "$acme_email"
 
-timezone="$(prompt_value 'Timezone (TZ database name)' 'Etc/UTC')"
+timezone="$(prompt_value 'Timezone (TZ database name, for example Etc/UTC, America/New_York, America/Chicago, America/Denver, America/Los_Angeles)' 'Etc/UTC')"
 require_non_empty 'Timezone' "$timezone"
 
 signup_domains_whitelist="$(prompt_value 'Allowed signup e-mail domains (comma or space separated)' "$zone")"
@@ -516,6 +548,13 @@ printf '  Terraform backup bucket: %s\n' "$backup_bucket_name"
 printf '  Bootstrap admin token: %s\n' "$bootstrap_admin_token"
 printf '  SMTP from: %s\n' "$smtp_from"
 
+print_admin_token_notice "$bootstrap_admin_token"
+
+if ! prompt_yes_no 'Have you copied the bootstrap admin token?' 'Y'; then
+  printf 'Aborted so you can copy the bootstrap admin token first.\n'
+  exit 0
+fi
+
 if ! prompt_yes_no 'Create or update these secrets, seed infra/terraform.tfvars, and prepare remote Terraform state now?' 'Y'; then
   printf 'Aborted without changing any secrets.\n'
   exit 0
@@ -532,5 +571,7 @@ gcloud services enable secretmanager.googleapis.com --project="$project_id" >/de
 printf 'Uploading secrets...\n'
 upsert_secret "$project_id" "$env_secret_name" "$env_file"
 upsert_secret "$project_id" "$ddclient_secret_name" "$ddclient_file"
+
+print_admin_token_notice "$bootstrap_admin_token"
 
 printf '\nDone. Terraform can now use %s and %s in project %s.\n' "$env_secret_name" "$ddclient_secret_name" "$project_id"
