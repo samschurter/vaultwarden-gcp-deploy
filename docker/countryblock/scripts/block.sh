@@ -9,7 +9,6 @@
 
 LOG=/var/log/block.log
 CHAIN=countryblock
-IPTABLES=iptables-legacy
 COUNTRIES="${COUNTRIES:-US}"
 INGRESS_CHAIN=DOCKER-USER
 PUBLIC_IFACE="${PUBLIC_IFACE:-eth0}"
@@ -20,9 +19,38 @@ PUBLISHED_TCP_PORTS="${PUBLISHED_TCP_PORTS:-80,443}"
 
 printf "Starting country allowlist construction for countries: %b\n" "$COUNTRIES" >> $LOG
 
+detect_iptables() {
+    local candidate
+
+    for candidate in iptables iptables-legacy; do
+        if ! command -v "$candidate" >/dev/null 2>&1; then
+            continue
+        fi
+
+        if "$candidate" -nL "$INGRESS_CHAIN" >/dev/null 2>&1; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    for candidate in iptables iptables-legacy; do
+        if command -v "$candidate" >/dev/null 2>&1; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+IPTABLES="$(detect_iptables)" || {
+    echo "Error: No supported iptables binary was found" >> $LOG
+    exit 1
+}
+
 ensure_ingress_chain() {
     if ! $IPTABLES -nL "$INGRESS_CHAIN" >/dev/null 2>&1; then
-        echo "Error: Expected Docker ingress chain $INGRESS_CHAIN was not found" >> $LOG
+        echo "Error: Expected Docker ingress chain $INGRESS_CHAIN was not found via $IPTABLES" >> $LOG
         echo "Managed deployment requires Docker published ports to traverse $INGRESS_CHAIN" >> $LOG
         return 1
     fi
