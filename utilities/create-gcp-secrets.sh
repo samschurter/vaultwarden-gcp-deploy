@@ -496,6 +496,7 @@ BACKUP_EMAIL_TO=$smtp_from
 BACKUP_EMAIL_NOTIFY=false
 BACKUP_RCLONE_CONF=/data/rclone/rclone.conf
 BACKUP_RCLONE_DEST=$backup_rclone_dest
+VWGC_DDCLIENT_CONF=/run/vaultwarden-gcp-deploy/ddclient.conf
 
 PUID=0
 PGID=0

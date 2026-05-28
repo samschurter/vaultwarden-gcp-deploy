@@ -34,6 +34,14 @@ load_env_file() {
 
 cd "$ROOT_DIR"
 
+compose_env_args=()
+compose_container_mounts=()
+
+if [ -f "$ENV_FILE" ]; then
+  compose_env_args+=(--env-file "$ENV_FILE")
+  compose_container_mounts+=( -v "$SECRETS_DIR:$SECRETS_DIR:ro" )
+fi
+
 if [ -f "$ENV_FILE" ]; then
   load_env_file "$ENV_FILE"
 
@@ -58,12 +66,14 @@ EOF
 fi
 
 if docker compose version >/dev/null 2>&1; then
-  docker compose up -d --build
+  docker compose "${compose_env_args[@]}" up -d --build
 else
   docker run --rm \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v "$ROOT_DIR:$ROOT_DIR" \
     -w "$ROOT_DIR" \
+    "${compose_container_mounts[@]}" \
     docker/compose:latest \
+    "${compose_env_args[@]}" \
     up -d --build
 fi
