@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+
+configure_docker_daemon() {
+  local desired_config
+  desired_config="$(mktemp)"
+
+  cat > "$desired_config" <<'EOF'
+{
+  "userland-proxy": false
+}
+EOF
+
+  mkdir -p /etc/docker
+
+  if ! cmp -s "$desired_config" /etc/docker/daemon.json; then
+    install -m 0644 "$desired_config" /etc/docker/daemon.json
+    systemctl restart docker
+  else
+    systemctl is-active --quiet docker || systemctl start docker
+  fi
+
+  rm -f "$desired_config"
+
+  for _ in $(seq 1 30); do
+    if docker info >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "Docker daemon did not become ready after applying managed network settings" >&2
+  return 1
+}
+
+configure_docker_daemon
+
+mkdir -p /opt
+
+if [ ! -d /opt/vaultwarden-gcp-deploy ]; then
+  docker run --rm \
+    -v /opt:/work \
+    -w /work \
+    alpine/git \
+    clone "${repo_url}" vaultwarden-gcp-deploy
+fi
+
+docker run --rm \
+  -v /opt/vaultwarden-gcp-deploy:/repo \
+  -w /repo \
+  alpine/git \
+  fetch --all --tags
+
+if [ -n "${repo_ref}" ]; then
+  docker run --rm \
+    -v /opt/vaultwarden-gcp-deploy:/repo \
+    -w /repo \
+    alpine/git \
+    checkout "${repo_ref}"
+fi
+
+chmod +x /opt/vaultwarden-gcp-deploy/utilities/*.sh
+
+export PROJECT_ID="${project_id}"
+export ENV_SECRET="${env_secret_name}"
+export DDCLIENT_SECRET="${ddclient_secret_name}"
+export WORKDIR="/opt/vaultwarden-gcp-deploy"
+
+bash /opt/vaultwarden-gcp-deploy/utilities/fetch-secrets.sh
+bash /opt/vaultwarden-gcp-deploy/utilities/bootstrap.sh
+
+# Schedule reboot when COS updates require it (runs in background).
+TZ="${reboot_timezone}" TIME="${reboot_time}" /opt/vaultwarden-gcp-deploy/utilities/reboot-on-update.sh &
