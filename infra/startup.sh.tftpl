@@ -54,6 +54,13 @@ fetch_secret() {
   output_dir="$(dirname "$output_path")"
   output_name="$(basename "$output_path")"
 
+  mkdir -p "$output_dir"
+
+  if [ -d "$output_path" ]; then
+    echo "Removing stale directory at secret file path: $output_path" >&2
+    rm -rf "$output_path"
+  fi
+
   docker run --rm \
     -e CLOUDSDK_CORE_PROJECT="$PROJECT_ID" \
     -e SECRET_NAME="$secret_name" \

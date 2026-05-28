@@ -23,7 +23,8 @@ ttl=1
 # API token (recommended)
 # Token must have: Zone:DNS:Edit and Zone:Zone:Read
 # Scope: include the target zone.
-# ddclient will create or update the hostname record below; no manual A record is required.
+# ddclient is expected to maintain the hostname record below.
+# If first boot fails to establish the record, create a DNS-only A record once and let ddclient update it afterward.
 login=token
 password=YOUR_CLOUDFLARE_API_TOKEN
 vw.example.com

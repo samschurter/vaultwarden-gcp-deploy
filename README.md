@@ -27,12 +27,12 @@ This workflow provisions an e2‑micro VM (Container‑Optimized OS), firewall r
 
 This deployment path assumes the repo's default operating model: Terraform provisions the VM and supporting resources, the instance pulls secrets from Secret Manager on boot, and the stack comes up with the bundled security controls enabled.
 
-For this deployment, Cloudflare is used as the DNS provider and ddclient manages a single hostname such as `vw.example.com` after the VM is created. You do not need to create or look up the hostname A record before deployment.
+For this deployment, Cloudflare is used as the DNS provider and ddclient manages a single hostname such as `vw.example.com` after the VM is created.
 
 - Add your domain to Cloudflare DNS at the domain level, for example `example.com`, not the Vaultwarden hostname.
 - If you bought the domain through Cloudflare Registrar and it already appears in your Cloudflare dashboard, you do not need to add it again.
 - Choose the Vaultwarden hostname you want to use under that domain, for example `vw.example.com`.
-- Do not create the Vaultwarden hostname record manually unless you are recovering from a failed or partial deployment. The managed flow lets ddclient create or update that record automatically on first boot.
+- If first-boot DDNS does not create the hostname successfully, create a DNS-only `A` record for the Vaultwarden hostname that points at the VM external IPv4 address, then let ddclient maintain it afterward.
 - When the hostname appears in Cloudflare, keep it in DNS-only mode. Do not enable the Cloudflare proxy for this setup.
 
 Terraform and gcloud are preinstalled and authenticated in Cloud Shell, so no local setup is required.
@@ -181,10 +181,11 @@ This checklist is intentionally incomplete for now and will grow as the deployme
 
 - If the domain does not resolve, verify the hostname in your ddclient secret matches your chosen hostname and that Cloudflare DNS is set to DNS-only.
 - If HTTPS fails, ensure ports 80 and 443 are open (this is handled by Terraform).
-- If ddclient is not updating, confirm the API token permissions and that the secret value matches your ddclient config.
+- If ddclient is not updating, confirm the API token permissions, that the secret value matches your ddclient config, and that the Cloudflare zone in the secret is the parent zone such as `example.com` rather than the full hostname.
+- If the hostname is still missing after first boot, create a DNS-only `A` record for the hostname once, then rerun ddclient and confirm it can update the record.
 
 ### Cloudflare DDNS (API token)
-Do not wait for the container to create `ddns/ddclient.conf`. Create the `vwgc-ddclient` Secret Manager secret before deployment, then let the VM write the file during first boot. In the managed flow, ddclient is also responsible for creating or updating the Vaultwarden hostname record, so you should not create that record by hand first. Keep the hostname in DNS-only mode rather than proxied mode.
+Do not wait for the container to create `ddns/ddclient.conf`. Create the `vwgc-ddclient` Secret Manager secret before deployment, then let the VM write the file during first boot. Keep the hostname in DNS-only mode rather than proxied mode. If first-boot DDNS does not establish the hostname record, create the `A` record once in Cloudflare and let ddclient maintain it after that.
 For the managed GCP flow, the VM now keeps the fetched env and ddclient secrets in runtime files instead of persisting them in the repo checkout.
 
 ### Local builds for bundled images
