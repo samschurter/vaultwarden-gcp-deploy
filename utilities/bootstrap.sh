@@ -6,12 +6,36 @@ SECRETS_DIR="${SECRETS_DIR:-/run/vaultwarden-gcp-deploy}"
 ENV_FILE="${ENV_FILE:-$SECRETS_DIR/.env}"
 DDCLIENT_CONF_FILE="${DDCLIENT_CONF_FILE:-$SECRETS_DIR/ddclient.conf}"
 
+load_env_file() {
+  local env_path="$1"
+  local line
+  local key
+  local value
+
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
+
+    case "$line" in
+      ''|'#'*)
+        continue
+        ;;
+      *=*)
+        key="${line%%=*}"
+        value="${line#*=}"
+        export "$key=$value"
+        ;;
+      *)
+        printf 'Error: invalid env file line: %s\n' "$line" >&2
+        return 1
+        ;;
+    esac
+  done < "$env_path"
+}
+
 cd "$ROOT_DIR"
 
 if [ -f "$ENV_FILE" ]; then
-  set -a
-  . "$ENV_FILE"
-  set +a
+  load_env_file "$ENV_FILE"
 
   export VWGC_ENV_FILE="$ENV_FILE"
   export VWGC_DDCLIENT_CONF="$DDCLIENT_CONF_FILE"

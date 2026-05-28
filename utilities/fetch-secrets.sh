@@ -11,11 +11,19 @@ GCLOUD_IMAGE="google/cloud-sdk:slim"
 fetch_secret() {
   local secret_name="$1"
   local output_path="$2"
+  local output_dir
+  local output_name
+
+  output_dir="$(dirname "$output_path")"
+  output_name="$(basename "$output_path")"
 
   docker run --rm \
     -e CLOUDSDK_CORE_PROJECT="$PROJECT_ID" \
+    -e SECRET_NAME="$secret_name" \
+    -e OUTPUT_NAME="$output_name" \
+    -v "$output_dir:/secrets" \
     "$GCLOUD_IMAGE" \
-    gcloud secrets versions access latest --secret="$secret_name" > "$output_path"
+    sh -lc 'gcloud secrets versions access latest --secret="$SECRET_NAME" > "/secrets/$OUTPUT_NAME"'
 }
 
 mkdir -p "$SECRETS_DIR"

@@ -4,6 +4,10 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 WORKDIR="/mnt/stateful_partition/vaultwarden-gcp-deploy"
+SECRETS_DIR="/run/vaultwarden-gcp-deploy"
+ENV_FILE="$SECRETS_DIR/.env"
+DDCLIENT_CONF_FILE="$SECRETS_DIR/ddclient.conf"
+GCLOUD_IMAGE="google/cloud-sdk:slim"
 
 configure_docker_daemon() {
   local desired_config
@@ -39,6 +43,88 @@ EOF
 
 configure_docker_daemon
 
+fetch_secret() {
+  local secret_name="$1"
+  local output_path="$2"
+  local output_dir
+  local output_name
+
+  output_dir="$(dirname "$output_path")"
+  output_name="$(basename "$output_path")"
+
+  docker run --rm \
+    -e CLOUDSDK_CORE_PROJECT="$PROJECT_ID" \
+    -e SECRET_NAME="$secret_name" \
+    -e OUTPUT_NAME="$output_name" \
+    -v "$output_dir:/secrets" \
+    "$GCLOUD_IMAGE" \
+    sh -lc 'gcloud secrets versions access latest --secret="$SECRET_NAME" > "/secrets/$OUTPUT_NAME"'
+}
+
+load_env_file() {
+  local env_path="$1"
+  local line
+  local key
+  local value
+
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="$${line%$'\r'}"
+
+    case "$line" in
+      ''|'#'*)
+        continue
+        ;;
+      *=*)
+        key="$${line%%=*}"
+        value="$${line#*=}"
+        export "$key=$value"
+        ;;
+      *)
+        echo "Invalid env file line: $line" >&2
+        return 1
+        ;;
+    esac
+  done < "$env_path"
+}
+
+bootstrap_stack() {
+  cd "$WORKDIR"
+
+  if [ -f "$ENV_FILE" ]; then
+    load_env_file "$ENV_FILE"
+
+    export VWGC_ENV_FILE="$ENV_FILE"
+    export VWGC_DDCLIENT_CONF="$DDCLIENT_CONF_FILE"
+
+    if printf ',%s,' "$${BACKUP:-}" | grep -qi ',rclone,'; then
+      host_rclone_dir="$WORKDIR/vaultwarden/rclone"
+      host_conf="$host_rclone_dir/rclone.conf"
+      mkdir -p "$host_rclone_dir"
+
+      if [ ! -f "$host_conf" ]; then
+        cat > "$host_conf" <<'EOF'
+[gcs]
+type = google cloud storage
+provider = GCE
+env_auth = true
+EOF
+        chmod 600 "$host_conf"
+      fi
+    fi
+  fi
+
+  if docker compose version >/dev/null 2>&1; then
+    docker compose up -d --build
+  else
+    docker run --rm \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -v "$WORKDIR:$WORKDIR" \
+      -w "$WORKDIR" \
+      docker/compose:latest \
+      up -d --build
+  fi
+}
+
 mkdir -p /mnt/stateful_partition
 
 if [ ! -d "$WORKDIR/.git" ]; then
@@ -69,8 +155,20 @@ export PROJECT_ID="${project_id}"
 export ENV_SECRET="${env_secret_name}"
 export DDCLIENT_SECRET="${ddclient_secret_name}"
 
-bash "$WORKDIR"/utilities/fetch-secrets.sh
-bash "$WORKDIR"/utilities/bootstrap.sh
+mkdir -p "$SECRETS_DIR"
+chmod 700 "$SECRETS_DIR"
+
+if [ -n "$ENV_SECRET" ]; then
+  fetch_secret "$ENV_SECRET" "$ENV_FILE"
+  chmod 600 "$ENV_FILE"
+fi
+
+if [ -n "$DDCLIENT_SECRET" ]; then
+  fetch_secret "$DDCLIENT_SECRET" "$DDCLIENT_CONF_FILE"
+  chmod 600 "$DDCLIENT_CONF_FILE"
+fi
+
+bootstrap_stack
 
 # Schedule reboot when COS updates require it (runs in background).
 TZ="${reboot_timezone}" TIME="${reboot_time}" "$WORKDIR"/utilities/reboot-on-update.sh &
