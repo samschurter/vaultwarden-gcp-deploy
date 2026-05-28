@@ -175,10 +175,11 @@ docker run --rm \
 
 if [ -n "${repo_ref}" ]; then
   docker run --rm \
+    -e REPO_REF="${repo_ref}" \
     -v "$WORKDIR:/repo" \
     -w /repo \
     alpine/git \
-    checkout "${repo_ref}"
+    sh -lc 'if git show-ref --verify --quiet "refs/remotes/origin/$REPO_REF"; then git checkout -B "$REPO_REF" "origin/$REPO_REF"; else git checkout "$REPO_REF"; fi'
 fi
 
 chmod +x "$WORKDIR"/utilities/*.sh
