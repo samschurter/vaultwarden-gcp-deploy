@@ -10,99 +10,104 @@ x-logging: &default-logging
 
 
 services:
-  vaultwarden:
-    # Standard Vaultwarden is very resource-heavy and cannot run on micro cloud instances
-    # Vaultwarden is a Rust (mostly) feature-complete implementation of Vaultwarden
-    # https://github.com/dani-garcia/vaultwarden
-    image: vaultwarden/server:latest-alpine
-    restart: always
-    container_name: vaultwarden
-    depends_on:
-    - proxy
-    <<: *default-logging
-    volumes:
-    - ${PWD}/vaultwarden:/data
-    environment:
-    - LOG_FILE=/data/vaultwarden.log
-    - SHOW_PASSWORD_HINT=false
-    - DOMAIN=https://${DOMAIN}          # DOMAIN is set in .env but doesn't have protocol prefix
-    - IP_HEADER=X-Real-IP
-    - ADMIN_TOKEN                       # Value-less variables are set in .env
-    - SIGNUPS_ALLOWED
-    - SIGNUPS_VERIFY
-    - SIGNUPS_DOMAINS_WHITELIST
-    - SMTP_HOST
-    - SMTP_FROM
-    - SMTP_FROM_NAME=Vaultwarden (${DOMAIN})
-    - SMTP_PORT
-    - SMTP_SECURITY
-    - SMTP_USERNAME
-    - SMTP_PASSWORD
-    - PUSH_ENABLED
-    - PUSH_INSTALLATION_ID
-    - PUSH_INSTALLATION_KEY
-    - YUBICO_CLIENT_ID
-    - YUBICO_SECRET_KEY
-    - YUBICO_SERVER
-    - ORG_CREATION_USERS
-    - TZ
+  # TEMPORARILY DISABLED BY USER REQUEST.
+  # Do not re-enable this service until the user explicitly asks for it.
+  # vaultwarden:
+  #   Standard Vaultwarden is very resource-heavy and cannot run on micro cloud instances
+  #   Vaultwarden is a Rust (mostly) feature-complete implementation of Vaultwarden
+  #   https://github.com/dani-garcia/vaultwarden
+  #   image: vaultwarden/server:latest-alpine
+  #   restart: always
+  #   container_name: vaultwarden
+  #   depends_on:
+  #   - proxy
+  #   <<: *default-logging
+  #   volumes:
+  #   - ${PWD}/vaultwarden:/data
+  #   environment:
+  #   - LOG_FILE=/data/vaultwarden.log
+  #   - SHOW_PASSWORD_HINT=false
+  #   - DOMAIN=https://${DOMAIN}          # DOMAIN is set in .env but doesn't have protocol prefix
+  #   - IP_HEADER=X-Real-IP
+  #   - ADMIN_TOKEN                       # Value-less variables are set in .env
+  #   - SIGNUPS_ALLOWED
+  #   - SIGNUPS_VERIFY
+  #   - SIGNUPS_DOMAINS_WHITELIST
+  #   - SMTP_HOST
+  #   - SMTP_FROM
+  #   - SMTP_FROM_NAME=Vaultwarden (${DOMAIN})
+  #   - SMTP_PORT
+  #   - SMTP_SECURITY
+  #   - SMTP_USERNAME
+  #   - SMTP_PASSWORD
+  #   - PUSH_ENABLED
+  #   - PUSH_INSTALLATION_ID
+  #   - PUSH_INSTALLATION_KEY
+  #   - YUBICO_CLIENT_ID
+  #   - YUBICO_SECRET_KEY
+  #   - YUBICO_SERVER
+  #   - ORG_CREATION_USERS
+  #   - TZ
 
+  # TEMPORARILY DISABLED BY USER REQUEST.
+  # Do not re-enable this service until the user explicitly asks for it.
+  # backup:
+  #   build: ./docker/backup
+  #   image: vwgc_backup:local
+  #   restart: on-failure
+  #   container_name: backup
+  #   depends_on:
+  #   - vaultwarden
+  #   <<: *default-logging
+  #   volumes:
+  #     - ${PWD}/vaultwarden:/data
+  #     - ${PWD}/vaultwarden/rclone:/data/rclone
+  #     - ${PWD}/vaultwarden/backups:/data/backups
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   environment:
+  #   - BACKUP                            # Value-less variables are set in .env
+  #   - BACKUP_SCHEDULE
+  #   - BACKUP_DAYS
+  #   - BACKUP_DIR
+  #   - BACKUP_ENCRYPTION_KEY
+  #   - BACKUP_EMAIL_TO
+  #   - BACKUP_EMAIL_NOTIFY
+  #   - BACKUP_RCLONE_CONF
+  #   - BACKUP_RCLONE_DEST
+  #   - SMTP_HOST
+  #   - SMTP_FROM
+  #   - SMTP_FROM_NAME=Vaultwarden Backup (${DOMAIN})
+  #   - SMTP_PORT
+  #   - SMTP_SECURITY
+  #   - SMTP_USERNAME
+  #   - SMTP_PASSWORD
+  #   - TZ
 
-  backup:
-    build: ./docker/backup
-    image: vwgc_backup:local
-    restart: on-failure
-    container_name: backup
-    depends_on:
-    - vaultwarden
-    <<: *default-logging
-    volumes:
-      - ${PWD}/vaultwarden:/data
-      - ${PWD}/vaultwarden/rclone:/data/rclone
-      - ${PWD}/vaultwarden/backups:/data/backups
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-    - BACKUP                            # Value-less variables are set in .env
-    - BACKUP_SCHEDULE
-    - BACKUP_DAYS
-    - BACKUP_DIR
-    - BACKUP_ENCRYPTION_KEY
-    - BACKUP_EMAIL_TO
-    - BACKUP_EMAIL_NOTIFY
-    - BACKUP_RCLONE_CONF
-    - BACKUP_RCLONE_DEST
-    - SMTP_HOST
-    - SMTP_FROM
-    - SMTP_FROM_NAME=Vaultwarden Backup (${DOMAIN})
-    - SMTP_PORT
-    - SMTP_SECURITY
-    - SMTP_USERNAME
-    - SMTP_PASSWORD
-    - TZ
-
-
-  proxy:
-    # Caddy provides an automatic HTTPS reverse proxy with Let's Encrypt cert provisioning
-    # Uses local Dockerfile to include tzdata package
-    # https://caddyserver.com/
-    build: ./docker/proxy
-    image: vwgc_caddy:local
-    restart: always
-    container_name: proxy
-    <<: *default-logging
-    volumes:
-    - ${PWD}/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-    - ${PWD}/caddy/data:/data
-    ports:
-    - 80:80                             # Port 80 is necessary for Let's Encrypt ACME
-    - 443:443
-    environment:
-    - DOMAIN                            # Value-less variables are set in .env
-    - EMAIL
-    - TZ
+  # TEMPORARILY DISABLED BY USER REQUEST.
+  # Do not re-enable this service until the user explicitly asks for it.
+  # proxy:
+  #   Caddy provides an automatic HTTPS reverse proxy with Let's Encrypt cert provisioning
+  #   Uses local Dockerfile to include tzdata package
+  #   https://caddyserver.com/
+  #   build: ./docker/proxy
+  #   image: vwgc_caddy:local
+  #   restart: always
+  #   container_name: proxy
+  #   <<: *default-logging
+  #   volumes:
+  #   - ${PWD}/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+  #   - ${PWD}/caddy/data:/data
+  #   ports:
+  #   - 80:80                             # Port 80 is necessary for Let's Encrypt ACME
+  #   - 443:443
+  #   environment:
+  #   - DOMAIN                            # Value-less variables are set in .env
+  #   - EMAIL
+  #   - TZ
 
 
   ddns:
+    # The user requested that only DDNS remain enabled until further notice.
     # This provides a ddclient dynamic dns updating cron which is as simple as running it
     # and editing the ddns/config/ddclient.conf file
     # https://github.com/linuxserver/docker-ddclient
@@ -110,8 +115,8 @@ services:
     restart: always
     container_name: ddns
     <<: *default-logging
-    depends_on:
-    - vaultwarden
+    # depends_on:
+    # - vaultwarden
     volumes:
     - ${VWGC_DDCLIENT_CONF}:/config/ddclient.conf
     environment:
@@ -119,95 +124,99 @@ services:
     - PGID
     - TZ
 
-
+  # TEMPORARILY DISABLED BY USER REQUEST.
+  # Do not re-enable this service until the user explicitly asks for it.
   # Uncomment if you want fail2ban to send e-mails,
   # and adjust the depends_on directive in the fail2ban service,
   # see https://github.com/crazy-max/docker-fail2ban/pull/169/files
-  msmtpd:
-    image: crazymax/msmtpd:latest
-    restart: always
-    container_name: fail2ban_msmtpd
-    <<: *default-logging
-    ports:
-    - "127.0.0.1:2500:2500"
-    environment:
-    - TZ
-    - SMTP_HOST
-    - SMTP_PORT
-    - SMTP_AUTH=on
-    - SMTP_USER=${SMTP_USERNAME}
-    - SMTP_PASSWORD
-    - SMTP_FROM
-    - SMTP_TLS
+  # msmtpd:
+  #   image: crazymax/msmtpd:latest
+  #   restart: always
+  #   container_name: fail2ban_msmtpd
+  #   <<: *default-logging
+  #   ports:
+  #   - "127.0.0.1:2500:2500"
+  #   environment:
+  #   - TZ
+  #   - SMTP_HOST
+  #   - SMTP_PORT
+  #   - SMTP_AUTH=on
+  #   - SMTP_USER=${SMTP_USERNAME}
+  #   - SMTP_PASSWORD
+  #   - SMTP_FROM
+  #   - SMTP_TLS
 
+  # TEMPORARILY DISABLED BY USER REQUEST.
+  # Do not re-enable this service until the user explicitly asks for it.
+  # fail2ban:
+  #   Implements fail2ban functionality, banning ips that
+  #   try to bruteforce your vault
+  #   https://github.com/dani-garcia/vaultwarden/wiki/Fail2Ban-Setup
+  #   https://github.com/crazy-max/docker-fail2ban
+  #   Managed deployment disables Docker's userland proxy, so public ingress to
+  #   published container ports is intentionally banned in DOCKER-USER rather than INPUT.
+  #   image: crazymax/fail2ban:latest
+  #   restart: always
+  #   container_name: fail2ban
+  #   <<: *default-logging
+  #   depends_on:
+  #   - vaultwarden
+  #   volumes:
+  #   - ${PWD}/fail2ban:/data
+  #   - ${PWD}/vaultwarden:/vaultwarden:ro
+  #   - /var/log:/var/log:ro
+  #   - /run/systemd/journal:/run/systemd/journal:ro 
+  #   network_mode: "host"
+  #   cap_add:
+  #   - NET_ADMIN
+  #   - NET_RAW
+  #   environment:
+  #   - F2B_DB_PURGE_AGE=30d
+  #   - F2B_LOG_LEVEL=INFO
+  #   - TZ
 
-  fail2ban:
-    # Implements fail2ban functionality, banning ips that
-    # try to bruteforce your vault
-    # https://github.com/dani-garcia/vaultwarden/wiki/Fail2Ban-Setup
-    # https://github.com/crazy-max/docker-fail2ban
-    # Managed deployment disables Docker's userland proxy, so public ingress to
-    # published container ports is intentionally banned in DOCKER-USER rather than INPUT.
-    image: crazymax/fail2ban:latest
-    restart: always
-    container_name: fail2ban
-    <<: *default-logging
-    depends_on:
-    - vaultwarden
-    volumes:
-    - ${PWD}/fail2ban:/data
-    - ${PWD}/vaultwarden:/vaultwarden:ro
-    - /var/log:/var/log:ro
-    - /run/systemd/journal:/run/systemd/journal:ro 
-    network_mode: "host"
-    cap_add:
-    - NET_ADMIN
-    - NET_RAW
-    environment:
-    - F2B_DB_PURGE_AGE=30d
-    - F2B_LOG_LEVEL=INFO
-    - TZ
+  # TEMPORARILY DISABLED BY USER REQUEST.
+  # Do not re-enable this service until the user explicitly asks for it.
+  # countryblock:
+  #   Country allowlist; defaults to US and drops other public sources
+  #   Managed deployment disables Docker's userland proxy so published Caddy ingress
+  #   stays on the kernel NAT path and can be filtered in DOCKER-USER.
+  #   Requires the listed firewall capabilities because it uses iptables and ipset
+  #   https://hub.docker.com/_/alpine/
+  #   build: ./docker/countryblock
+  #   image: vwgc_countryblock:local
+  #   restart: always
+  #   container_name: countryblock
+  #   <<: *default-logging
+  #   depends_on:
+  #   - vaultwarden
+  #   network_mode: "host"
+  #   cap_add:
+  #   - NET_ADMIN
+  #   - NET_RAW
+  #   environment:
+  #   - COUNTRIES
+  #   - COUNTRYBLOCK_SCHEDULE
+  #   - TZ
 
-
-  countryblock:
-    # Country allowlist; defaults to US and drops other public sources
-    # Managed deployment disables Docker's userland proxy so published Caddy ingress
-    # stays on the kernel NAT path and can be filtered in DOCKER-USER.
-    # Requires the listed firewall capabilities because it uses iptables and ipset
-    # https://hub.docker.com/_/alpine/
-    build: ./docker/countryblock
-    image: vwgc_countryblock:local
-    restart: always
-    container_name: countryblock
-    <<: *default-logging
-    depends_on:
-    - vaultwarden
-    network_mode: "host"
-    cap_add:
-    - NET_ADMIN
-    - NET_RAW
-    environment:
-    - COUNTRIES
-    - COUNTRYBLOCK_SCHEDULE
-    - TZ
-
-
-  watchtower:
-    # Watchtower will pull down your new image, gracefully shut down your existing container
-    # and restart it with the same options that were used when it was deployed initially
-    # Uses the active nicholas-fedor fork because containrrr/watchtower was archived
-    # in December 2025 and is now read-only.
-    # https://github.com/nicholas-fedor/watchtower
-    image: nickfedor/watchtower
-    restart: always
-    container_name: watchtower
-    <<: *default-logging
-    depends_on:
-    - vaultwarden
-    volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-    - WATCHTOWER_CLEANUP=true
-    - WATCHTOWER_SCHEDULE
-    - TZ
+  # TEMPORARILY DISABLED BY USER REQUEST.
+  # Do not re-enable this service until the user explicitly asks for it.
+  # watchtower:
+  #   Watchtower will pull down your new image, gracefully shut down your existing container
+  #   and restart it with the same options that were used when it was deployed initially
+  #   Uses the active nicholas-fedor fork because containrrr/watchtower was archived
+  #   in December 2025 and is now read-only.
+  #   https://github.com/nicholas-fedor/watchtower
+  #   image: nickfedor/watchtower
+  #   restart: always
+  #   container_name: watchtower
+  #   <<: *default-logging
+  #   depends_on:
+  #   - vaultwarden
+  #   volumes:
+  #   - /var/run/docker.sock:/var/run/docker.sock
+  #   environment:
+  #   - WATCHTOWER_CLEANUP=true
+  #   - WATCHTOWER_SCHEDULE
+  #   - TZ
 
