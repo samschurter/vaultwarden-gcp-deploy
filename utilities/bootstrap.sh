@@ -5,6 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SECRETS_DIR="${SECRETS_DIR:-/run/vaultwarden-gcp-deploy}"
 ENV_FILE="${ENV_FILE:-$SECRETS_DIR/.env}"
 DDCLIENT_CONF_FILE="${DDCLIENT_CONF_FILE:-$SECRETS_DIR/ddclient.conf}"
+COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-$SECRETS_DIR/compose.env}"
+COMPOSE_COMPAT_IMAGE="${COMPOSE_COMPAT_IMAGE:-docker/compose:2.29.7}"
 
 load_env_file() {
   local env_path="$1"
@@ -32,15 +34,54 @@ load_env_file() {
   done < "$env_path"
 }
 
+require_bootstrap_inputs() {
+  if [ ! -s "$ENV_FILE" ]; then
+    printf 'Error: required env file is missing or empty: %s\n' "$ENV_FILE" >&2
+    return 1
+  fi
+
+  if grep -q '^  ddns:' docker-compose.yml && [ ! -s "$DDCLIENT_CONF_FILE" ]; then
+    printf 'Error: required ddclient config is missing or empty: %s\n' "$DDCLIENT_CONF_FILE" >&2
+    return 1
+  fi
+}
+
+write_compose_env_file() {
+  : > "$COMPOSE_ENV_FILE"
+
+  if [ -f "$ENV_FILE" ]; then
+    cat "$ENV_FILE" >> "$COMPOSE_ENV_FILE"
+    printf '\n' >> "$COMPOSE_ENV_FILE"
+  fi
+
+  printf 'VWGC_DDCLIENT_CONF=%s\n' "$DDCLIENT_CONF_FILE" >> "$COMPOSE_ENV_FILE"
+  chmod 600 "$COMPOSE_ENV_FILE"
+}
+
+run_compose() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose --env-file "$COMPOSE_ENV_FILE" "$@"
+    return
+  fi
+
+  if command -v docker-compose >/dev/null 2>&1 && docker-compose version >/dev/null 2>&1; then
+    docker-compose --env-file "$COMPOSE_ENV_FILE" "$@"
+    return
+  fi
+
+  docker run --rm \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v "$ROOT_DIR:$ROOT_DIR" \
+    -v "$SECRETS_DIR:$SECRETS_DIR:ro" \
+    -w "$ROOT_DIR" \
+    "$COMPOSE_COMPAT_IMAGE" \
+    --env-file "$COMPOSE_ENV_FILE" \
+    "$@"
+}
+
 cd "$ROOT_DIR"
 
-compose_env_args=()
-compose_container_mounts=()
-
-if [ -f "$ENV_FILE" ]; then
-  compose_env_args+=(--env-file "$ENV_FILE")
-  compose_container_mounts+=( -v "$SECRETS_DIR:$SECRETS_DIR:ro" )
-fi
+require_bootstrap_inputs
 
 if [ -f "$ENV_FILE" ]; then
   load_env_file "$ENV_FILE"
@@ -65,15 +106,5 @@ EOF
   fi
 fi
 
-if docker compose version >/dev/null 2>&1; then
-  docker compose "${compose_env_args[@]}" up -d --build
-else
-  docker run --rm \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    -v "$ROOT_DIR:$ROOT_DIR" \
-    -w "$ROOT_DIR" \
-    "${compose_container_mounts[@]}" \
-    docker/compose:latest \
-    "${compose_env_args[@]}" \
-    up -d --build
-fi
+write_compose_env_file
+run_compose up -d --build
