@@ -5,6 +5,7 @@ RUN ln -sf /proc/1/fd/1 /var/log/block.log
 
 COPY scripts/block_init.sh /
 COPY scripts/block.sh /
+RUN chmod +x /block_init.sh /block.sh
 
 ENTRYPOINT ["/block_init.sh"]
 CMD ["/block.sh", "start"]

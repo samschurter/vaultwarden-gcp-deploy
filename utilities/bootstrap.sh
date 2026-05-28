@@ -98,4 +98,4 @@ EOF
 fi
 
 write_compose_env_file
-run_compose up -d --build
+run_compose up -d --build --quiet-pull

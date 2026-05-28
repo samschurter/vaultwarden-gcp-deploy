@@ -113,7 +113,7 @@ services:
     depends_on:
     - vaultwarden
     volumes:
-    - ${VWGC_DDCLIENT_CONF}:/config/ddclient.conf:ro
+    - ${VWGC_DDCLIENT_CONF}:/config/ddclient.conf
     environment:
     - PUID
     - PGID
