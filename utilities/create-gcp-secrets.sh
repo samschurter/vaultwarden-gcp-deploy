@@ -104,6 +104,15 @@ require_non_empty() {
   fi
 }
 
+validate_cloudflare_token() {
+  local token="$1"
+
+  if [[ ! "$token" =~ ^cfat_[^[:space:]]{48}$ ]]; then
+    printf 'Error: Cloudflare API token must begin with cfat_ and be 53 characters long.\n' >&2
+    exit 1
+  fi
+}
+
 ensure_project_services_enabled() {
   printf 'Ensuring required Google Cloud APIs are enabled...\n'
 
@@ -432,6 +441,7 @@ bootstrap_admin_token="$(generate_admin_token)"
 
 cloudflare_token="$(prompt_secret 'Cloudflare API token')"
 require_non_empty 'Cloudflare API token' "$cloudflare_token"
+validate_cloudflare_token "$cloudflare_token"
 
 backup_bucket_name=''
 backup_path='vaultwarden'
