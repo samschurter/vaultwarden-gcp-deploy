@@ -6,7 +6,7 @@ SECRETS_DIR="${SECRETS_DIR:-/run/vaultwarden-gcp-deploy}"
 ENV_FILE="${ENV_FILE:-$SECRETS_DIR/.env}"
 DDCLIENT_CONF_FILE="${DDCLIENT_CONF_FILE:-$SECRETS_DIR/ddclient.conf}"
 COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-$SECRETS_DIR/compose.env}"
-COMPOSE_COMPAT_IMAGE="${COMPOSE_COMPAT_IMAGE:-docker/compose:2.29.7}"
+COMPOSE_RUNNER_IMAGE="${COMPOSE_RUNNER_IMAGE:-docker:27.4.1-cli}"
 
 load_env_file() {
   local env_path="$1"
@@ -59,22 +59,13 @@ write_compose_env_file() {
 }
 
 run_compose() {
-  if docker compose version >/dev/null 2>&1; then
-    docker compose --env-file "$COMPOSE_ENV_FILE" "$@"
-    return
-  fi
-
-  if command -v docker-compose >/dev/null 2>&1 && docker-compose version >/dev/null 2>&1; then
-    docker-compose --env-file "$COMPOSE_ENV_FILE" "$@"
-    return
-  fi
-
   docker run --rm \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v "$ROOT_DIR:$ROOT_DIR" \
     -v "$SECRETS_DIR:$SECRETS_DIR:ro" \
     -w "$ROOT_DIR" \
-    "$COMPOSE_COMPAT_IMAGE" \
+    "$COMPOSE_RUNNER_IMAGE" \
+    compose \
     --env-file "$COMPOSE_ENV_FILE" \
     "$@"
 }

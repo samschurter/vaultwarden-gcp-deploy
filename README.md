@@ -152,7 +152,7 @@ The VM automatically runs a startup script that:
 
 1. Uses Docker that ships with COS.
 2. Clones this repo into `/mnt/stateful_partition/vaultwarden-gcp-deploy`.
-3. Pulls secrets from Secret Manager into runtime files and starts the stack from them.
+3. Pulls secrets from Secret Manager into runtime files and starts the stack from them using a pinned Docker CLI image to run `docker compose` against the COS Docker daemon.
 4. Builds the local images and starts the stack.
 5. Schedules a reboot when COS updates require it.
 
