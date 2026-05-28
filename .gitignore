@@ -1,2 +1,6 @@
 .env
 *.swp
+infra/backend.hcl
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*

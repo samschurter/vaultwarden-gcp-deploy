@@ -11,7 +11,11 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 ENV_SECRET_NAME="${ENV_SECRET_NAME:-vwgc-env}"
 DDCLIENT_SECRET_NAME="${DDCLIENT_SECRET_NAME:-vwgc-ddclient}"
 TFVARS_FILE="$ROOT_DIR/infra/terraform.tfvars"
+BACKEND_CONFIG_FILE="$ROOT_DIR/infra/backend.hcl"
 SCRIPT_MODE="${1:-create}"
+TFSTATE_BUCKET_NAME="${TFSTATE_BUCKET_NAME:-}"
+TFSTATE_BUCKET_LOCATION="${TFSTATE_BUCKET_LOCATION:-us-central1}"
+TFSTATE_PREFIX="${TFSTATE_PREFIX:-vaultwarden}"
 
 require_command() {
   local command_name="$1"
@@ -214,9 +218,74 @@ upsert_tfvars_entry() {
   mv "$temp_file" "$TFVARS_FILE"
 }
 
-seed_tfvars_file() {
+seed_project_tfvars_file() {
   upsert_tfvars_entry "project_id" "$(tfvars_string "$project_id")"
+}
+
+seed_tfvars_file() {
+  seed_project_tfvars_file
   upsert_tfvars_entry "backup_bucket_name" "$(tfvars_string "$backup_bucket_name")"
+}
+
+write_backend_config() {
+  local bucket_name="$1"
+  local prefix="$2"
+
+  cat > "$BACKEND_CONFIG_FILE" <<EOF
+bucket = "$bucket_name"
+prefix = "$prefix"
+EOF
+}
+
+ensure_terraform_backend_ready() {
+  local bucket_name
+
+  bucket_name="${TFSTATE_BUCKET_NAME:-${project_id}-vaultwarden-tfstate}"
+
+  printf '\nPreparing Terraform remote state...\n'
+  gcloud services enable storage.googleapis.com --project="$project_id" >/dev/null
+
+  if gcloud storage buckets describe "gs://$bucket_name" --project="$project_id" >/dev/null 2>&1; then
+    printf 'Terraform state bucket already exists: %s\n' "$bucket_name"
+  else
+    gcloud storage buckets create "gs://$bucket_name" \
+      --project="$project_id" \
+      --location="$TFSTATE_BUCKET_LOCATION" \
+      --uniform-bucket-level-access >/dev/null
+    printf 'Created Terraform state bucket %s in %s\n' "$bucket_name" "$TFSTATE_BUCKET_LOCATION"
+  fi
+
+  write_backend_config "$bucket_name" "$TFSTATE_PREFIX"
+  printf 'Wrote Terraform backend config %s\n' "$BACKEND_CONFIG_FILE"
+}
+
+prepare_terraform_mode() {
+  local bucket_name
+
+  bucket_name="${TFSTATE_BUCKET_NAME:-${project_id}-vaultwarden-tfstate}"
+
+  printf 'Prepare Terraform remote state and local backend config.\n\n'
+  printf 'Using active gcloud project: %s\n\n' "$project_id"
+
+  printf 'Summary\n'
+  printf '  Project: %s\n' "$project_id"
+  printf '  terraform.tfvars: %s\n' "$TFVARS_FILE"
+  printf '  Terraform state bucket: %s\n' "$bucket_name"
+  printf '  Terraform state bucket location: %s\n' "$TFSTATE_BUCKET_LOCATION"
+  printf '  Terraform backend prefix: %s\n' "$TFSTATE_PREFIX"
+  printf '  Terraform backend config: %s\n' "$BACKEND_CONFIG_FILE"
+
+  if ! prompt_yes_no 'Create or update the Terraform backend config now?' 'Y'; then
+    printf 'Aborted without changing Terraform backend configuration.\n'
+    exit 0
+  fi
+
+  printf '\nUpdating terraform.tfvars...\n'
+  seed_project_tfvars_file
+  ensure_terraform_backend_ready
+
+  printf '\nDone. Run terraform init -backend-config=backend.hcl from infra/ to attach to the shared remote state.\n'
+  exit 0
 }
 
 clear_admin_token_mode() {
@@ -257,16 +326,21 @@ clear_admin_token_mode() {
 case "$SCRIPT_MODE" in
   create|--create)
     ;;
+  --prepare-terraform)
+    ;;
   --clear-admin-token)
     ;;
   *)
-    printf 'Usage: %s [--clear-admin-token]\n' "${0##*/}" >&2
+    printf 'Usage: %s [--prepare-terraform|--clear-admin-token]\n' "${0##*/}" >&2
     exit 1
     ;;
 esac
 
 require_command gcloud
-require_command openssl
+
+if [ "$SCRIPT_MODE" = 'create' ] || [ "$SCRIPT_MODE" = '--create' ]; then
+  require_command openssl
+fi
 
 active_account="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1)"
 if [ -z "$active_account" ]; then
@@ -288,6 +362,10 @@ fi
 
 if [ "$SCRIPT_MODE" = '--clear-admin-token' ]; then
   clear_admin_token_mode
+fi
+
+if [ "$SCRIPT_MODE" = '--prepare-terraform' ]; then
+  prepare_terraform_mode
 fi
 
 printf 'This script creates or updates the Secret Manager secrets used by the Terraform deployment.\n\n'
@@ -430,19 +508,23 @@ printf '  Cloudflare zone: %s\n' "$zone"
 printf '  Env secret: %s\n' "$env_secret_name"
 printf '  ddclient secret: %s\n' "$ddclient_secret_name"
 printf '  terraform.tfvars: %s\n' "$TFVARS_FILE"
+printf '  Terraform state bucket: %s\n' "${TFSTATE_BUCKET_NAME:-${project_id}-vaultwarden-tfstate}"
+printf '  Terraform backend config: %s\n' "$BACKEND_CONFIG_FILE"
 printf '  Signup domain whitelist: %s\n' "$signup_domains_whitelist"
 printf '  Backup destination: %s\n' "$backup_rclone_dest"
 printf '  Terraform backup bucket: %s\n' "$backup_bucket_name"
 printf '  Bootstrap admin token: %s\n' "$bootstrap_admin_token"
 printf '  SMTP from: %s\n' "$smtp_from"
 
-if ! prompt_yes_no 'Create or update these secrets and seed infra/terraform.tfvars now?' 'Y'; then
+if ! prompt_yes_no 'Create or update these secrets, seed infra/terraform.tfvars, and prepare remote Terraform state now?' 'Y'; then
   printf 'Aborted without changing any secrets.\n'
   exit 0
 fi
 
 printf '\nUpdating terraform.tfvars...\n'
 seed_tfvars_file
+
+ensure_terraform_backend_ready
 
 printf '\nEnsuring Secret Manager API is enabled...\n'
 gcloud services enable secretmanager.googleapis.com --project="$project_id" >/dev/null

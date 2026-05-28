@@ -75,6 +75,10 @@ The generated secret contents are based on [`.env.template`](.env.template) and 
 
 The script always configures the deployment to sync backups to GCS. It also finds or creates [infra/terraform.tfvars](infra/terraform.tfvars) and seeds it with the active `project_id` and the matching `backup_bucket_name`.
 
+The same helper also prepares Terraform remote state for the Cloud Shell-first workflow. It creates or reuses a dedicated GCS bucket named `PROJECT_ID-vaultwarden-tfstate` by default and writes a local `infra/backend.hcl` file that points Terraform at that shared state bucket.
+
+`backend.hcl` is kept separate from `terraform.tfvars` because Terraform initializes the backend before it loads input variables.
+
 You do not need to know the VM IP yet. ddclient updates the hostname after Terraform creates the VM and the startup script finishes.
 
 The DNS flow for the managed deployment is:
@@ -84,9 +88,11 @@ The DNS flow for the managed deployment is:
 3. Run `terraform apply`.
 4. Wait for first boot to finish and let ddclient create or update the hostname in Cloudflare.
 
-### 3) Create terraform.tfvars
+### 3) Create terraform.tfvars and backend config
 
 The helper script can create or update [infra/terraform.tfvars](infra/terraform.tfvars) for you. It always seeds `project_id` and `backup_bucket_name`.
+
+It also creates or updates a local `infra/backend.hcl` file for Terraform remote state. That file is not committed.
 
 Open [infra/terraform.tfvars](infra/terraform.tfvars) and make sure these values are set the way you want:
 
@@ -109,15 +115,32 @@ backup_bucket_name   = "your-project-id-vaultwarden-backups"
 
 If you are not sure, keep the defaults for region and zone above.
 
+The generated backend config points Terraform at the shared GCS state bucket, so a new Cloud Shell session or a local machine can reattach to the same deployment state instead of starting from an empty local `terraform.tfstate`.
+
 ### 4) Deploy
 
 From the repo root in Cloud Shell, run these commands in order:
 
 1. `cd infra`
-2. `terraform init`
+2. `terraform init -backend-config=backend.hcl`
 3. `terraform apply`
 
 After apply completes, the output includes the VM’s external IP address.
+
+If you are re-running this from a different machine or a fresh Cloud Shell home directory, use `terraform init -reconfigure -backend-config=backend.hcl`.
+
+### Reattach Terraform state from a new environment
+
+If your original Cloud Shell home directory has expired or you want to switch from Cloud Shell to a local machine, do not run Terraform against a fresh local state file.
+
+From the repo root in the new environment:
+
+1. Authenticate `gcloud` to the same project.
+2. Run `bash utilities/create-gcp-secrets.sh --prepare-terraform`.
+3. `cd infra`
+4. `terraform init -reconfigure -backend-config=backend.hcl`
+
+The `--prepare-terraform` mode recreates `infra/backend.hcl` locally if needed, seeds `project_id` into [infra/terraform.tfvars](infra/terraform.tfvars), and creates the remote state bucket if it does not already exist.
 
 ### What happens after deploy
 
