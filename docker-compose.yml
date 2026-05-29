@@ -17,7 +17,7 @@ services:
     # Intentionally runs before proxy to make sure that the DNS A record is up to date BEFORE ACME cert provisioning is 
     # attempted by Caddy.
     image: lscr.io/linuxserver/ddclient:latest
-    restart: always
+    restart: on-failure
     container_name: ddns
     <<: *default-logging
     volumes:
@@ -33,7 +33,7 @@ services:
     # https://caddyserver.com/
     build: ./docker/proxy
     image: vwgc_caddy:local
-    restart: always
+    restart: on-failure
     container_name: proxy
     depends_on:
       - ddns
@@ -54,7 +54,7 @@ services:
     # Vaultwarden is a Rust (mostly) feature-complete implementation of Vaultwarden
     # https://github.com/dani-garcia/vaultwarden
     image: vaultwarden/server:latest-alpine
-    restart: always
+    restart: on-failure
     container_name: vaultwarden
     depends_on:
     - proxy
@@ -123,7 +123,7 @@ services:
   # see https://github.com/crazy-max/docker-fail2ban/pull/169/files
   msmtpd:
     image: crazymax/msmtpd:latest
-    restart: always
+    restart: on-failure
     container_name: fail2ban_msmtpd
     <<: *default-logging
     ports:
@@ -145,7 +145,7 @@ services:
     # Managed deployment disables Docker's userland proxy, so public ingress to
     # published container ports is intentionally banned in DOCKER-USER rather than INPUT.
     image: crazymax/fail2ban:latest
-    restart: always
+    restart: on-failure
     container_name: fail2ban
     <<: *default-logging
     depends_on:
@@ -171,7 +171,7 @@ services:
     # https://hub.docker.com/_/alpine/
     build: ./docker/countryblock
     image: vwgc_countryblock:local
-    restart: always
+    restart: on-failure
     container_name: countryblock
     <<: *default-logging
     depends_on:
@@ -191,7 +191,7 @@ services:
     # in December 2025 and is now read-only.
     # https://github.com/nicholas-fedor/watchtower
     image: nickfedor/watchtower
-    restart: always
+    restart: on-failure
     container_name: watchtower
     <<: *default-logging
     depends_on:
