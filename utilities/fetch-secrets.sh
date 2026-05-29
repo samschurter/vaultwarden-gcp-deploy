@@ -4,7 +4,7 @@ set -euo pipefail
 PROJECT_ID="${PROJECT_ID:?PROJECT_ID is required}"
 ENV_SECRET="${ENV_SECRET:-}"
 DDCLIENT_SECRET="${DDCLIENT_SECRET:-}"
-SECRETS_DIR="${SECRETS_DIR:-/run/vaultwarden-gcp-deploy}"
+SECRETS_DIR="${SECRETS_DIR:-/mnt/stateful_partition/run/vaultwarden-gcp-deploy}"
 
 GCLOUD_IMAGE="google/cloud-sdk:slim"
 

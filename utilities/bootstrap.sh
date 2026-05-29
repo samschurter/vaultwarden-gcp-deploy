@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SECRETS_DIR="${SECRETS_DIR:-/run/vaultwarden-gcp-deploy}"
+SECRETS_DIR="${SECRETS_DIR:-/mnt/stateful_partition/run/vaultwarden-gcp-deploy}"
 ENV_FILE="${ENV_FILE:-$SECRETS_DIR/.env}"
 DDCLIENT_CONF_FILE="${DDCLIENT_CONF_FILE:-$SECRETS_DIR/ddclient.conf}"
 COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-$SECRETS_DIR/compose.env}"

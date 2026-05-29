@@ -4,7 +4,7 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 WORKDIR="/mnt/stateful_partition/vaultwarden-gcp-deploy"
-SECRETS_DIR="/run/vaultwarden-gcp-deploy"
+SECRETS_DIR="/mnt/stateful_partition/run/vaultwarden-gcp-deploy"
 ENV_FILE="$SECRETS_DIR/.env"
 DDCLIENT_CONF_FILE="$SECRETS_DIR/ddclient.conf"
 COMPOSE_ENV_FILE="$SECRETS_DIR/compose.env"
@@ -165,6 +165,8 @@ EOF
 }
 
 mkdir -p /mnt/stateful_partition
+mkdir -p "$SECRETS_DIR"
+chmod 700 "$SECRETS_DIR"
 
 if [ ! -d "$WORKDIR/.git" ]; then
   docker run --rm \
@@ -199,9 +201,6 @@ fi
 export PROJECT_ID="${project_id}"
 export ENV_SECRET="${env_secret_name}"
 export DDCLIENT_SECRET="${ddclient_secret_name}"
-
-mkdir -p "$SECRETS_DIR"
-chmod 700 "$SECRETS_DIR"
 
 if [ -n "$ENV_SECRET" ]; then
   fetch_secret "$ENV_SECRET" "$ENV_FILE"

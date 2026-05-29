@@ -152,9 +152,11 @@ The VM automatically runs a startup script that:
 
 1. Uses Docker that ships with COS.
 2. Clones this repo into `/mnt/stateful_partition/vaultwarden-gcp-deploy`.
-3. Pulls secrets from Secret Manager into runtime files and starts the stack from them using a pinned Docker CLI image to run `docker compose` against the COS Docker daemon.
+3. Pulls secrets from Secret Manager into runtime files under `/mnt/stateful_partition/run/vaultwarden-gcp-deploy` and starts the stack from them using a pinned Docker CLI image to run `docker compose` against the COS Docker daemon.
 4. Builds the local images and starts the stack.
 5. Schedules a reboot when COS updates require it.
+
+The bundled proxy image also delays Caddy startup until the configured hostname resolves to the VM's current external IPv4, so ACME does not race ahead of ddclient after first boot or an ephemeral-IP reboot.
 
 The Terraform-managed VM also enables Container-Optimized OS Cloud Logging and serial port logging so Google Cloud Logging is the primary operator view for first boot and runtime troubleshooting. See [ADMINISTRATOR.md](ADMINISTRATOR.md) for the operator-focused logging notes.
 
@@ -181,12 +183,13 @@ This checklist is intentionally incomplete for now and will grow as the deployme
 
 - If the domain does not resolve, verify the hostname in your ddclient secret matches your chosen hostname and that Cloudflare DNS is set to DNS-only.
 - If HTTPS fails, ensure ports 80 and 443 are open (this is handled by Terraform).
+- If HTTPS fails immediately after a reboot or first boot, check whether the proxy logs are still waiting for DNS to move the hostname to the VM's current external IP before Caddy starts.
 - If ddclient is not updating, confirm the API token permissions, that the secret value matches your ddclient config, and that the Cloudflare zone in the secret is the parent zone such as `example.com` rather than the full hostname.
 - If the hostname is still missing after first boot, create a DNS-only `A` record for the hostname once, then rerun ddclient and confirm it can update the record.
 
 ### Cloudflare DDNS (API token)
 Do not wait for the container to create `ddns/ddclient.conf`. Create the `vwgc-ddclient` Secret Manager secret before deployment, then let the VM write the file during first boot. Keep the hostname in DNS-only mode rather than proxied mode. If first-boot DDNS does not establish the hostname record, create the `A` record once in Cloudflare and let ddclient maintain it after that.
-For the managed GCP flow, the VM now keeps the fetched env and ddclient secrets in runtime files instead of persisting them in the repo checkout.
+For the managed GCP flow, the VM keeps the fetched env and ddclient secrets in runtime files on the stateful partition instead of persisting them in the repo checkout. This allows Docker's reboot-time container restarts to see the last fetched config before the startup script refreshes those files from Secret Manager.
 
 ### Local builds for bundled images
 This repo builds the proxy, backup, and countryblock images locally from the Dockerfiles under [docker](docker) instead of pulling third-party images.
