@@ -11,4 +11,4 @@ COPY scripts/start-caddy.sh /usr/local/bin/start-caddy.sh
 RUN chmod 755 /usr/local/bin/start-caddy.sh
 
 ENTRYPOINT ["/usr/local/bin/start-caddy.sh"]
-CMD ["caddy", "docker-proxy", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
