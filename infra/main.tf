@@ -65,15 +65,15 @@ resource "google_compute_firewall" "allow_http_https" {
   }
 
   source_ranges = ["0.0.0.0/0"]
-  target_tags = ["http-server", "https-server", var.instance_name]
+  target_tags   = ["http-server", "https-server", var.instance_name]
 }
 
 resource "google_compute_firewall" "deny_ssh" {
   # Explicitly override default-network SSH exposure for this VM.
-  name      = "${var.instance_name}-deny-ssh"
-  network   = "default"
-  priority  = 900
-  direction = "INGRESS"
+  name       = "${var.instance_name}-deny-ssh"
+  network    = "default"
+  priority   = 900
+  direction  = "INGRESS"
   depends_on = [google_project_service.required]
 
   deny {
@@ -172,23 +172,22 @@ resource "google_compute_instance" "vaultwarden" {
   }
 
   metadata = {
-    # Make Cloud Logging the primary operator surface for COS system and
-    # container logs, and retain serial console output for boot troubleshooting.
-    google-logging-enabled     = "true"
+    # Disable COS log shipping at the source by default; retain serial boot logs.
+    google-logging-enabled     = tostring(var.enable_cos_logging)
     serial-port-logging-enable = "true"
   }
 
   metadata_startup_script = templatefile("${path.module}/startup.sh.tftpl", {
     # Bootstraps repo clone + secret fetch + docker compose.
-    repo_url              = var.repo_url
-    repo_ref              = var.repo_ref
-    project_id            = var.project_id
-    backup_bucket_name    = local.backup_bucket_name
-    env_secret_name       = var.env_secret_name
-    ddclient_secret_name  = var.ddclient_secret_name
-    restore_backup_path   = var.restore_backup_path
-    reboot_timezone       = var.reboot_timezone
-    reboot_time           = var.reboot_time
+    repo_url             = var.repo_url
+    repo_ref             = var.repo_ref
+    project_id           = var.project_id
+    backup_bucket_name   = local.backup_bucket_name
+    env_secret_name      = var.env_secret_name
+    ddclient_secret_name = var.ddclient_secret_name
+    restore_backup_path  = var.restore_backup_path
+    reboot_timezone      = var.reboot_timezone
+    reboot_time          = var.reboot_time
   })
 }
 

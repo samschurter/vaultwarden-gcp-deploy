@@ -55,8 +55,14 @@ variable "image_project" {
 
 variable "use_static_ip" {
   # Static IPs are paid; default to ephemeral and use ddclient DDNS.
-  # If you enable static IP, you can point DNS directly and skip ddclient.
+  # Boot-time ddclient updates also work with a static IP.
   description = "Reserve and attach a static external IP"
+  type        = bool
+  default     = false
+}
+
+variable "enable_cos_logging" {
+  description = "Upload COS system, container, audit, and journal logs to Cloud Logging (enable for troubleshooting)"
   type        = bool
   default     = false
 }

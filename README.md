@@ -21,7 +21,9 @@ You will need:
 
 Caddy provisions HTTPS for your Vaultwarden hostname (for example `vw.example.com`),
 so that hostname must resolve to the VM's public IP. The VM uses an ephemeral IP by
-default, so a DDNS updater (`ddclient`) keeps DNS pointed at it. Choose the path that
+default, so `ddclient` updates DNS once on every VM boot using the external IPv4
+from GCP metadata. It runs as a temporary container before the application stack,
+with up to three attempts and no background polling or ipify requests. Choose the path that
 matches where your domain is managed:
 
 - **Cloudflare** — your domain is managed in Cloudflare DNS. `ddclient` updates the
@@ -107,6 +109,8 @@ The main settings are:
     - The GCS bucket name to use for Vaultwarden backups, for example `vw-backups`. Leave blank to use the default `<project_id>-vaultwarden-backups`.
 - `restore_backup_path`
     - If you are recovering from a backup, set this to the object path in the managed backup bucket, for example `vaultwarden/vw_backup_2026-06-08-000002.tar.gz`. Otherwise leave it blank.
+- `enable_cos_logging`
+    - Defaults to `false` to suppress all `cos_*` log uploads at the VM. Set to `true` for troubleshooting. Serial boot logs remain enabled, and Docker retains rotated local logs in either mode.
 
 If you are unsure, keep the default region and zone values already written by the repo.
 
@@ -134,11 +138,18 @@ On first boot, the VM:
 
 1. Clones this repo onto the stateful partition.
 2. Fetches the env and ddclient secrets from Secret Manager.
-3. Starts the compose stack.
-4. Builds the local backup and countryblock images.
-5. Schedules automatic reboots when COS updates require one.
+3. Runs ddclient once with the VM's metadata external IPv4; failure after bounded retries aborts startup.
+4. Builds the local backup and countryblock images and starts the Compose stack.
+5. Removes any legacy continuously running `ddns` container from an earlier deployment.
+6. Schedules automatic reboots when COS updates require one.
 
 The proxy waits for the hostname to resolve to the VM before Caddy starts, which prevents early certificate requests before DDNS is in place.
+
+The DNS update runs on subsequent boots as well. Restarting application containers
+does not rerun ddclient. Existing DDNS secrets work without regeneration: the
+updater overrides their polling and IP-discovery settings while preserving provider
+credentials. See [DNS operations](ADMINISTRATOR.md#dns-operations) for manual reruns
+and migration checks.
 
 ## 6. Confirm the site is live
 
@@ -323,7 +334,7 @@ Use this when the VM or its disk is lost or unrecoverable and you want to bring 
     ```
 
    Resolve any drift shown by the plan, then `terraform apply` to converge. The snapshot schedule re-attaches to the new boot disk on the next apply.
-6. Confirm DNS still points at the instance IP. If you use an ephemeral IP, update your DNS record (or rely on ddclient) to the new address.
+6. Confirm DNS points at the instance IP. If it changed, rerun the boot-time DNS updater or update the record manually; a VM created without startup metadata will not automatically run ddclient.
 
 ## Day-two operations
 

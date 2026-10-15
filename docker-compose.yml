@@ -11,23 +11,6 @@ x-logging: &default-logging
 
 
 services:
-  ddns:
-    # This provides a ddclient dynamic dns updating cron which is as simple as running it
-    # and editing the ddns/config/ddclient.conf file
-    # https://github.com/linuxserver/docker-ddclient
-    # Intentionally runs before proxy to make sure that the DNS A record is up to date BEFORE ACME cert provisioning is 
-    # attempted by Caddy.
-    image: lscr.io/linuxserver/ddclient:latest
-    restart: on-failure
-    container_name: ddns
-    <<: *default-logging
-    volumes:
-    - ${VWGC_DDCLIENT_CONF}:/config/ddclient.conf
-    environment:
-    - PUID
-    - PGID
-    - TZ
-
   proxy:
     # Caddy provides an automatic HTTPS reverse proxy with Let's Encrypt cert provisioning.
     # The startup wrapper is bind-mounted so the upstream image can stay Watchtower-managed.
@@ -35,8 +18,6 @@ services:
     image: serfriz/caddy-ratelimit-dockerproxy-sablier:2.11
     restart: on-failure
     container_name: proxy
-    depends_on:
-      - ddns
     <<: *default-logging
     entrypoint:
     - /bin/sh
@@ -221,7 +202,6 @@ services:
     depends_on:
     - vaultwarden
     command:
-    - ddns
     - proxy
     - vaultwarden
     - fail2ban_msmtpd

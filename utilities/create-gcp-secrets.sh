@@ -693,9 +693,6 @@ upsert_env_setting "$env_file" "BACKUP" "rclone"
 upsert_env_setting "$env_file" "BACKUP_EMAIL_TO" "$smtp_from"
 upsert_env_setting "$env_file" "BACKUP_RCLONE_CONF" "/data/rclone/rclone.conf"
 upsert_env_setting "$env_file" "BACKUP_RCLONE_DEST" "$backup_rclone_dest"
-upsert_env_setting "$env_file" "VWGC_DDCLIENT_CONF" "/mnt/stateful_partition/run/vaultwarden-gcp-deploy/ddclient.conf"
-upsert_env_setting "$env_file" "PUID" "0"
-upsert_env_setting "$env_file" "PGID" "0"
 
 if [ "$dns_provider" = 'cloudflare' ]; then
   render_ddclient_template "$DDCLIENT_CLOUDFLARE_TEMPLATE_FILE" "$ddclient_file"

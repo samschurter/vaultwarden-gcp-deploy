@@ -40,7 +40,7 @@ require_bootstrap_inputs() {
     return 1
   fi
 
-  if grep -q '^  ddns:' docker-compose.yml && [ ! -s "$DDCLIENT_CONF_FILE" ]; then
+  if [ ! -s "$DDCLIENT_CONF_FILE" ]; then
     printf 'Error: required ddclient config is missing or empty: %s\n' "$DDCLIENT_CONF_FILE" >&2
     return 1
   fi
@@ -54,7 +54,6 @@ write_compose_env_file() {
     printf '\n' >> "$COMPOSE_ENV_FILE"
   fi
 
-  printf 'VWGC_DDCLIENT_CONF=%s\n' "$DDCLIENT_CONF_FILE" >> "$COMPOSE_ENV_FILE"
   chmod 600 "$COMPOSE_ENV_FILE"
 }
 
@@ -78,7 +77,6 @@ if [ -f "$ENV_FILE" ]; then
   load_env_file "$ENV_FILE"
 
   export VWGC_ENV_FILE="$ENV_FILE"
-  export VWGC_DDCLIENT_CONF="$DDCLIENT_CONF_FILE"
 
   if printf ',%s,' "${BACKUP:-}" | grep -qi ',rclone,'; then
     host_rclone_dir="$ROOT_DIR/vaultwarden/rclone"
@@ -98,4 +96,5 @@ EOF
 fi
 
 write_compose_env_file
-run_compose up -d --build --quiet-pull
+DDCLIENT_CONF_FILE="$DDCLIENT_CONF_FILE" bash "$ROOT_DIR/utilities/update-dns.sh"
+run_compose up -d --build --quiet-pull --remove-orphans
