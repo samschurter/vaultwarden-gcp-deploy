@@ -326,5 +326,33 @@ fi
 bootstrap_stack
 restore_from_backup
 
-# Schedule reboot when COS updates require it (runs in background).
-TZ="${reboot_timezone}" TIME="${reboot_time}" sh "$WORKDIR"/utilities/reboot-on-update.sh &
+# Keep long-lived monitoring outside the guest startup process. Startup verifies
+# the updater is reachable; systemd records any later watcher failure separately.
+if [ "${enable_cos_auto_updates}" = "true" ]; then
+  cat > /etc/systemd/system/vaultwarden-update-reboot.service <<EOF
+[Unit]
+Description=Reboot Vaultwarden VM after a confirmed COS update
+Requires=update-engine.service
+After=update-engine.service
+
+[Service]
+Type=exec
+Environment="TZ=${reboot_timezone}"
+Environment="TIME=${reboot_time}"
+ExecStart=/bin/sh $WORKDIR/utilities/reboot-on-update.sh
+StandardOutput=journal+console
+StandardError=journal+console
+EOF
+
+  systemctl daemon-reload
+  systemctl start update-engine.service
+  if ! update_engine_client --status >/dev/null; then
+    echo "COS automatic updates enabled but update engine is unavailable; reboot watcher not started" >&2
+    exit 1
+  fi
+  systemctl restart vaultwarden-update-reboot.service
+  echo "COS update/reboot watcher started as vaultwarden-update-reboot.service"
+else
+  systemctl stop vaultwarden-update-reboot.service 2>/dev/null || true
+  echo "COS automatic updates disabled; update/reboot watcher not started"
+fi

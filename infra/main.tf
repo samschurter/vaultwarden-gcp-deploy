@@ -6,16 +6,18 @@ locals {
   instance_metadata = {
     google-logging-enabled     = tostring(var.enable_cos_logging)
     serial-port-logging-enable = tostring(var.enable_serial_logging)
+    cos-update-strategy        = var.enable_cos_auto_updates ? "update_enabled" : "update_disabled"
     vwgc-restore-backup-path   = var.restore_backup_path
     startup-script = templatefile("${path.module}/startup.sh.tftpl", {
-      repo_url             = var.repo_url
-      repo_ref             = var.repo_ref
-      project_id           = var.project_id
-      backup_bucket_name   = local.backup_bucket_name
-      env_secret_name      = var.env_secret_name
-      ddclient_secret_name = var.ddclient_secret_name
-      reboot_timezone      = var.reboot_timezone
-      reboot_time          = var.reboot_time
+      repo_url                = var.repo_url
+      repo_ref                = var.repo_ref
+      project_id              = var.project_id
+      backup_bucket_name      = local.backup_bucket_name
+      env_secret_name         = var.env_secret_name
+      ddclient_secret_name    = var.ddclient_secret_name
+      reboot_timezone         = var.reboot_timezone
+      reboot_time             = var.reboot_time
+      enable_cos_auto_updates = var.enable_cos_auto_updates
     })
   }
   required_services = toset([

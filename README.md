@@ -105,12 +105,16 @@ The main settings are:
     - The timezone to use for automatic reboots when COS updates require one, for example `America/Chicago`.
 - `reboot_time`
     - The time to schedule automatic reboots, in 24-hour `HH:MM` format, for example `03:00`.
+- `enable_cos_auto_updates`
+    - Defaults to `true`, explicitly enabling COS OS updates and a managed reboot watcher. A reboot is scheduled only after the update engine confirms an installed update requires one. Set to `false` if you manage OS updates separately.
 - `backup_bucket_name`
     - The GCS bucket name to use for Vaultwarden backups, for example `vw-backups`. Leave blank to use the default `<project_id>-vaultwarden-backups`.
 - `restore_backup_path`
     - If you are recovering from a backup, set this to the object path in the managed backup bucket, for example `vaultwarden/vw_backup_2026-06-08-000002.tar.gz`. Otherwise leave it blank. This is a separate instance-metadata request read on boot; changing it does not replace or restart the VM.
 - `enable_cos_logging`
-    - Defaults to `false` to suppress all `cos_*` log uploads at the VM. Set to `true` for troubleshooting. Serial boot logs remain enabled, and Docker retains rotated local logs in either mode.
+    - Defaults to `false` to suppress all `cos_*` log uploads at the VM. Set to `true` for troubleshooting. Docker retains rotated local logs in either mode.
+- `enable_serial_logging`
+    - Defaults to `false` to suppress serial-console uploads, including kernel and network-interface chatter. Enable it for persistent serial history in Cloud Logging. Recent serial output from a running VM remains readable through the Compute API without SSH.
 
 If you are unsure, keep the default region and zone values already written by the repo.
 
@@ -148,7 +152,7 @@ On first boot, the VM:
 3. Runs ddclient once with the VM's metadata external IPv4; failure after bounded retries aborts startup.
 4. Builds the local backup and countryblock images and starts the Compose stack.
 5. Removes any legacy continuously running `ddns` container from an earlier deployment.
-6. Schedules automatic reboots when COS updates require one.
+6. Verifies the COS update engine and starts a systemd reboot watcher when automatic OS updates are enabled. The watcher schedules a reboot only after confirming an update requires one.
 
 The proxy waits for the hostname to resolve to the VM before Caddy starts, which prevents early certificate requests before DDNS is in place.
 

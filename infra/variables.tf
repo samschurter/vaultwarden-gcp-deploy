@@ -73,6 +73,12 @@ variable "enable_serial_logging" {
   default     = false
 }
 
+variable "enable_cos_auto_updates" {
+  description = "Enable COS in-place OS updates and schedule a reboot only when the update engine confirms one is required"
+  type        = bool
+  default     = true
+}
+
 variable "repo_url" {
   # Repo cloned by the startup script.
   description = "Git repo URL for the deployment"
@@ -120,6 +126,11 @@ variable "reboot_timezone" {
   description = "Timezone for reboot scheduling"
   type        = string
   default     = "Etc/UTC"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$", var.reboot_timezone))
+    error_message = "Use a TZ database name such as Etc/UTC or America/Chicago."
+  }
 }
 
 variable "reboot_time" {
@@ -127,6 +138,11 @@ variable "reboot_time" {
   description = "Time of day for reboot scheduling (HH:MM)"
   type        = string
   default     = "06:00"
+
+  validation {
+    condition     = can(regex("^([01][0-9]|2[0-3]):[0-5][0-9]$", var.reboot_time))
+    error_message = "Reboot time must be a 24-hour HH:MM value."
+  }
 }
 
 variable "enable_disk_snapshots" {
