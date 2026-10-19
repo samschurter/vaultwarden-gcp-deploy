@@ -67,6 +67,12 @@ variable "enable_cos_logging" {
   default     = false
 }
 
+variable "enable_serial_logging" {
+  description = "Upload serial-console output to Cloud Logging; recent output remains available through the Compute API when disabled"
+  type        = bool
+  default     = false
+}
+
 variable "repo_url" {
   # Repo cloned by the startup script.
   description = "Git repo URL for the deployment"

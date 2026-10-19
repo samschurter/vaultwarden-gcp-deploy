@@ -5,7 +5,7 @@ locals {
   # Metadata updates preserve the instance; boot explicitly to run a new script.
   instance_metadata = {
     google-logging-enabled     = tostring(var.enable_cos_logging)
-    serial-port-logging-enable = "true"
+    serial-port-logging-enable = tostring(var.enable_serial_logging)
     vwgc-restore-backup-path   = var.restore_backup_path
     startup-script = templatefile("${path.module}/startup.sh.tftpl", {
       repo_url             = var.repo_url
