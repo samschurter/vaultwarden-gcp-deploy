@@ -4,3 +4,5 @@ infra/backend.hcl
 infra/.terraform/
 infra/*.tfstate
 infra/*.tfstate.*
+infra/.startup-metadata-migration.sh
+infra/startup-metadata-migration_override.tf

@@ -166,6 +166,35 @@ wait_for_container_running() {
   return 1
 }
 
+read_restore_request() {
+  local response_file
+  local status
+  response_file="$(mktemp)"
+
+  # Read instance metadata only: project metadata must not request a restore.
+  # A missing key is no request; transport/server errors must abort startup.
+  if ! status="$(curl --silent --show-error --noproxy '*' \
+    --connect-timeout 5 --max-time 15 --retry 2 --retry-delay 2 \
+    -H 'Metadata-Flavor: Google' --output "$response_file" --write-out '%%{http_code}' \
+    http://metadata.google.internal/computeMetadata/v1/instance/attributes/vwgc-restore-backup-path)"; then
+    rm -f "$response_file"
+    echo "Could not read restore request from instance metadata; aborting startup" >&2
+    return 1
+  fi
+
+  case "$status" in
+    200) RESTORE_BACKUP_PATH="$(cat "$response_file")" ;;
+    404) RESTORE_BACKUP_PATH="" ;;
+    *)
+      rm -f "$response_file"
+      echo "Could not read restore request from instance metadata (HTTP $status); aborting startup" >&2
+      return 1
+      ;;
+  esac
+  rm -f "$response_file"
+  export RESTORE_BACKUP_PATH
+}
+
 restore_from_backup() {
   local configured_path="$${RESTORE_BACKUP_PATH#/}"
   local restore_id
@@ -206,6 +235,7 @@ restore_from_backup() {
   docker exec backup ash /backup.sh restore "$container_restore_path"
 
   printf '%s\n' "$object_uri" > "$stamp_file"
+  echo "Restore completed for $object_uri" >&2
 }
 
 bootstrap_stack() {
@@ -281,7 +311,7 @@ export PROJECT_ID="${project_id}"
 export BACKUP_BUCKET_NAME="${backup_bucket_name}"
 export ENV_SECRET="${env_secret_name}"
 export DDCLIENT_SECRET="${ddclient_secret_name}"
-export RESTORE_BACKUP_PATH="${restore_backup_path}"
+read_restore_request
 
 if [ -n "$ENV_SECRET" ]; then
   fetch_secret "$ENV_SECRET" "$ENV_FILE"

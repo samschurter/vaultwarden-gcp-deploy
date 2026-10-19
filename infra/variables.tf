@@ -103,8 +103,8 @@ variable "backup_bucket_name" {
 }
 
 variable "restore_backup_path" {
-  # One-shot recovery input: object path inside the managed backup bucket.
-  description = "Optional GCS object path inside the managed backup bucket to restore on boot"
+  # Read separately from instance metadata at boot; clearing it needs no reboot.
+  description = "Optional GCS object path to restore on next boot, stored in instance metadata separately from the startup script"
   type        = string
   default     = ""
 }

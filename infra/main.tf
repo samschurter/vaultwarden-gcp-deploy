@@ -2,6 +2,22 @@ locals {
   backup_bucket_name = var.backup_bucket_name != "" ? var.backup_bucket_name : "${var.project_id}-${var.instance_name}-backups"
   # Default snapshots to the deployment region (single-region) unless overridden.
   snapshot_storage_location = var.snapshot_storage_location != "" ? var.snapshot_storage_location : var.region
+  # Metadata updates preserve the instance; boot explicitly to run a new script.
+  instance_metadata = {
+    google-logging-enabled     = tostring(var.enable_cos_logging)
+    serial-port-logging-enable = "true"
+    vwgc-restore-backup-path   = var.restore_backup_path
+    startup-script = templatefile("${path.module}/startup.sh.tftpl", {
+      repo_url             = var.repo_url
+      repo_ref             = var.repo_ref
+      project_id           = var.project_id
+      backup_bucket_name   = local.backup_bucket_name
+      env_secret_name      = var.env_secret_name
+      ddclient_secret_name = var.ddclient_secret_name
+      reboot_timezone      = var.reboot_timezone
+      reboot_time          = var.reboot_time
+    })
+  }
   required_services = toset([
     "cloudresourcemanager.googleapis.com",
     "compute.googleapis.com",
@@ -171,24 +187,7 @@ resource "google_compute_instance" "vaultwarden" {
     scopes = ["cloud-platform"]
   }
 
-  metadata = {
-    # Disable COS log shipping at the source by default; retain serial boot logs.
-    google-logging-enabled     = tostring(var.enable_cos_logging)
-    serial-port-logging-enable = "true"
-  }
-
-  metadata_startup_script = templatefile("${path.module}/startup.sh.tftpl", {
-    # Bootstraps repo clone + secret fetch + docker compose.
-    repo_url             = var.repo_url
-    repo_ref             = var.repo_ref
-    project_id           = var.project_id
-    backup_bucket_name   = local.backup_bucket_name
-    env_secret_name      = var.env_secret_name
-    ddclient_secret_name = var.ddclient_secret_name
-    restore_backup_path  = var.restore_backup_path
-    reboot_timezone      = var.reboot_timezone
-    reboot_time          = var.reboot_time
-  })
+  metadata = local.instance_metadata
 }
 
 resource "google_compute_resource_policy" "snapshot" {

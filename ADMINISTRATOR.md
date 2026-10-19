@@ -18,8 +18,26 @@ When you want to roll out repo changes:
 
 1. Pull the latest repo changes into your working copy.
 2. Review any changes to secrets or Terraform variables.
-3. Run `terraform plan` from `infra/` and review the proposed changes before applying them. A change to `metadata_startup_script` can require instance replacement, including its auto-deleted boot disk. Do not apply a replacement plan for a running vault without an explicit recovery/migration plan and verified backups.
-4. Apply the reviewed plan, then arrange a boot to run the new startup flow. Editing the repo or updating instance metadata alone does not guarantee startup ran again. Ensure `repo_ref` resolves to the commit containing the change.
+3. Run `terraform plan` from `infra/` and review the proposed changes before applying them. Startup content is managed through `metadata["startup-script"]`, so routine script changes update metadata in place. Other changes can still replace the VM and its auto-deleted boot disk; review every replacement separately.
+4. Apply the reviewed plan, then stop/start the existing VM to run the new startup flow. Editing the repo or updating instance metadata alone does not execute startup. Ensure `repo_ref` resolves to the commit containing the change and clear any unwanted restore request before booting.
+
+From `infra/`, after applying an in-place update:
+
+```bash
+project_id="$(terraform console <<< 'var.project_id' | jq -er .)"
+instance_zone="$(terraform console <<< 'var.zone' | jq -er .)"
+instance_name="$(terraform output -raw instance_name)"
+gcloud compute instances stop "$instance_name" --project="$project_id" --zone="$instance_zone"
+gcloud compute instances start "$instance_name" --project="$project_id" --zone="$instance_zone"
+```
+
+This uses the Compute API and requires no SSH. It preserves the existing boot
+disk and application data, with downtime while the VM is stopped and startup
+converges the stack. An ephemeral external IP can change; boot-time ddclient
+updates DNS. Terraform apply finishing does not mean guest startup has finished;
+check serial output and HTTPS readiness.
+
+
 
 ## Change application settings
 
@@ -37,7 +55,7 @@ Update flow:
 
 1. Run `bash utilities/create-gcp-secrets.sh`.
 2. Update the prompted values.
-3. Run `terraform apply`.
+3. Review/apply Terraform, then stop/start the VM so startup fetches the new secret.
 
 For Terraform-controlled settings such as region, zone, reboot schedule, backup bucket, or restore path, edit `infra/terraform.tfvars` and then apply Terraform.
 
@@ -133,23 +151,35 @@ Routine checks:
 
 If you change the backup bucket name, update `infra/terraform.tfvars` and apply Terraform.
 
-If you change backup behavior such as schedule, retention, or notification settings, update the env secret and apply Terraform.
+If you change backup behavior such as schedule, retention, or notification settings,
+update the env secret, review/apply Terraform, and stop/start the VM to fetch the new settings.
 
 ## Restore from backup
 
-Restore is handled at boot, using `restore_backup_path` in Terraform.
+Restore is handled at boot, using `restore_backup_path` in Terraform. Terraform
+stores this as the instance metadata key `vwgc-restore-backup-path`, separately
+from `metadata["startup-script"]`. Setting or clearing it updates metadata in place;
+it does not execute a restore, reboot, or replace the VM by itself. Complete the
+legacy startup-script migration above first if applicable.
 
 Procedure:
 
 1. Identify the object path in the managed backup bucket.
 2. Set `restore_backup_path` in `infra/terraform.tfvars` to that object path.
-3. Run `terraform apply`.
-4. Wait for the VM to boot and the restore to complete.
-5. Validate the site and logs.
+3. Review the plan and run `terraform apply` to publish the request.
+4. Stop/start the VM using the commands above (or let first boot handle a newly created VM). Wait for serial output reporting `Restore completed` and successful application startup.
+5. Validate the restored vault contents and HTTPS, not just Terraform's exit status.
 6. Clear `restore_backup_path` back to `""`.
-7. Run `terraform apply` again.
+7. Review the plan and run `terraform apply` again. This removes the request in place; no reboot is needed for cleanup.
 
 The restore uses the current backup encryption key from the env secret when the archive is encrypted.
+Only instance metadata is consulted. An absent or empty request skips restoration;
+a metadata transport/server failure aborts startup instead of silently ignoring a
+possible restore. A successful restore is stamped on the persistent disk, so the
+same archive path is skipped on subsequent boots of that disk. Failure leaves no
+success stamp and is retried on a later boot. Clearing the request does not erase
+the stamp or undo restored data; restoring the same archive again on the same disk
+would require a deliberate separate operation.
 
 ## Reattach Terraform state in a new environment
 

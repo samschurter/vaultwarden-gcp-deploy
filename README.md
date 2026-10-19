@@ -108,7 +108,7 @@ The main settings are:
 - `backup_bucket_name`
     - The GCS bucket name to use for Vaultwarden backups, for example `vw-backups`. Leave blank to use the default `<project_id>-vaultwarden-backups`.
 - `restore_backup_path`
-    - If you are recovering from a backup, set this to the object path in the managed backup bucket, for example `vaultwarden/vw_backup_2026-06-08-000002.tar.gz`. Otherwise leave it blank.
+    - If you are recovering from a backup, set this to the object path in the managed backup bucket, for example `vaultwarden/vw_backup_2026-06-08-000002.tar.gz`. Otherwise leave it blank. This is a separate instance-metadata request read on boot; changing it does not replace or restart the VM.
 - `enable_cos_logging`
     - Defaults to `false` to suppress all `cos_*` log uploads at the VM. Set to `true` for troubleshooting. Serial boot logs remain enabled, and Docker retains rotated local logs in either mode.
 
@@ -129,6 +129,13 @@ If you are attaching to an existing deployment from a new Cloud Shell session or
 ```bash
 terraform init -reconfigure -backend-config=backend.hcl
 ```
+
+For an existing VM managed with the old `metadata_startup_script` argument, follow
+the [two-phase migration](ADMINISTRATOR.md#migrate-an-existing-metadata_startup_script-deployment)
+before applying a changed startup script. Routine updates thereafter use
+`metadata["startup-script"]` and preserve the VM and disk. After applying an update,
+explicitly stop/start the VM to execute startup; metadata changes alone do not
+run it. See [deployment updates](ADMINISTRATOR.md#keep-the-deployment-current).
 
 ## 5. Wait for first boot
 
@@ -180,7 +187,8 @@ cd infra
 terraform apply
 ```
 
-At that point the admin page is disabled again.
+Stop/start the VM using the [deployment update procedure](ADMINISTRATOR.md#keep-the-deployment-current)
+so startup fetches the updated secret, then verify the admin page is disabled.
 
 ## Optional: Enable Google Workspace SSO
 
@@ -267,7 +275,8 @@ These map to the following env settings (also documented in `.env.template`):
 - `SSO_CLIENT_ID` / `SSO_CLIENT_SECRET` — from the OAuth client.
 - `SSO_IDENTIFIER` — cosmetic value used only in the login redirect.
 
-After applying Terraform (or redeploying), confirm `https://your-hostname` redirects
+After applying Terraform and stop/starting the VM to fetch the updated secret,
+confirm `https://your-hostname` redirects
 into the Google sign-in flow and returns you to the master-password unlock.
 
 > First-time users with `SSO_ONLY=true`: because the root redirect points at the SSO
@@ -288,10 +297,13 @@ Snapshots are enabled by default: daily, single-region, retained for 30 days, wi
 1. Find the object path you want to restore from the managed backup bucket.
 2. Set `restore_backup_path` in `infra/terraform.tfvars`.
 3. Run `terraform apply`.
-4. Wait for the VM to boot and complete the restore.
+4. For an existing VM, explicitly stop/start it; a new VM runs startup on first boot. Wait for restore completion in serial output and validate the restored vault.
 5. Clear `restore_backup_path` back to `""` and apply again.
 
-Restores are boot-time operations. This repo does not assume routine SSH access or manual in-place recovery steps.
+The restore request is separate from the startup script. Clearing it applies in
+place without rebooting or replacing the VM. Restores remain boot-time operations;
+see [restore administration](ADMINISTRATOR.md#restore-from-backup) for request and
+completion semantics. This repo does not assume routine SSH access.
 
 ### Restore from a snapshot (disaster recovery)
 
